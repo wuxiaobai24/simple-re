@@ -66,7 +66,7 @@ class NFA:
         nfa.end.isEnd = False
         return NFA(start, end)
 
-    def toGraph(self):
+    def toGraph(self, state_prefix='State'):
         dot = Digraph(name='nfa', format="png")
         dot.attr(rankdir='LR')
         state2index = {}
@@ -78,7 +78,7 @@ class NFA:
             state = q.popleft()
             if state in state2index:
                 continue
-            state2index[state] = 'State' + str(len(state2index))
+            state2index[state] = state_prefix + str(len(state2index))
             index = state2index[state]
             dot.node(name = index, label=index, shape= 'doublecircle' if state.isEnd else 'circle')
             for token, states in state.next.items():
@@ -98,8 +98,9 @@ class NFA:
         dot.render(filename='nfa', directory='./')
         return state2index
 	
-    def geneState2Index(self):
+    def geneState2Index(self, state_prefix='State', alphabet_flag = False):
         state2index = {}
+        alphabet = []
         q = deque()
         q.append(self.start)
 
@@ -107,14 +108,16 @@ class NFA:
             state = q.popleft()
             if state in state2index:
                 continue
-            state2index[state] = 'State' + str(len(state2index))
+            state2index[state] = state_prefix + str(len(state2index))
             index = state2index[state]
             for token, states in state.next.items():
+                if alphabet_flag:
+                    alphabet.append(token)
                 for nextState in states:
                     q.append(nextState)
-
+        if alphabet_flag:
+            return state2index, set(alphabet)
         return state2index
-        
 	
     def GetEpsilonClosure(states):
         visited = set(states)
@@ -144,3 +147,39 @@ class NFA:
             if state.isEnd:
                 return True
         return False
+
+    def toDFA(self):
+        state2index, alphabet = self.geneState2Index('', alphabet_flag=True)
+        alphabet.remove(Epsilon)
+        print(alphabet)
+        index2state = {}
+        def hashfunc(states):
+            return '#'.join(sorted(set([state2index[state] for state in states])))
+
+        def statesIsEnd(states):
+            for state in states:
+                if state.isEnd:
+                    return True
+            return False
+        
+        def GeneNewState(states):
+            index = hashfunc(states)
+            if index not in index2state:
+                isEnd = statesIsEnd(states)
+                new_state = State(isEnd)
+                index2state[index] = new_state
+                for c in alphabet:
+                    next_states = [] 
+                    for i_state in states:
+                        next_states += i_state.next.get(c, [])
+                    next_states = NFA.GetEpsilonClosure(set(next_states))
+                    next_index = hashfunc(next_states)
+                    if next_index not in index2state:
+                        next_state = GeneNewState(next_states)
+                    next_state = index2state[next_index]
+                    new_state.addNext(c, next_state)
+            return index2state[index]
+
+        states = NFA.GetEpsilonClosure([self.start])
+        start = GeneNewState(states)
+        return NFA(start, None)

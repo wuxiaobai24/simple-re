@@ -6,6 +6,8 @@ s = sys.argv[2]
 # print(filename, s)
 s = preprocess(s)
 nfa = re2nfa(s)
+dfa = nfa.toDFA()
+dfa.toGraph()
 
 with open(filename, 'r') as f:
     text = f.read().lower()
@@ -22,4 +24,4 @@ for word in words:
     if nfa.match(word):
         print(word)
 
-nfa.toGraph()
+# nfa.toGraph()
